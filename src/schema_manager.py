@@ -1,6 +1,7 @@
 import sqlite3
 import config as conf
 import sql_sanitizer as sanitizer
+import pandas
 
 
 class SchemaManager:
@@ -8,16 +9,15 @@ class SchemaManager:
         config = conf.Config()
         db_path = config.get_db_path()
         self.conn = sqlite3.connect(db_path)
-        self.cursor = self.conn.cursor()
+        self.cursor = self.conn.cursor() #TODO: maybe separate this concern?
 
     def get_existing_tables(self) -> list:
-        getTablesQueries = """SELECT name \
+        getTablesQueries = """SELECT name 
                        FROM sqlite_master
                        WHERE type = 'table';"""
 
         self.cursor.execute(getTablesQueries)
         tables = [row[0] for row in self.cursor.fetchall()]
-
         return tables
 
     def get_table_schema(self, table_name: str) -> dict:
@@ -32,7 +32,11 @@ class SchemaManager:
 
         return schema
 
-    def evaluate_compatibility(self, csv_schema, table_name) -> str:
+    def evaluate_compatibility(self, SQL_statement: ) -> str:
+
+
+
+
 
 
     def build_create_table_sql(self, table_name, schema) -> str:
