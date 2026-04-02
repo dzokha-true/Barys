@@ -1,44 +1,24 @@
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+
+def parse_max_rows_context(raw_value: str) -> int:
+    try:
+        max_rows = int(raw_value)
+    except ValueError as exc:
+        raise ValueError("MAX_ROWS_CONTEXT must be an integer") from exc
+
+    return max_rows
+
 
 class Config:
-    def __init__(self):
-        #SQLite database path
-        self.db_path = self.get_db_path()
-        
-        #Error log path
-        self.error_log_path = self.get_error_log_path()
+    def __init__(self) -> None:
+        load_dotenv(find_dotenv()) #TODO: this is probably bad practice?
 
-        #LLM settings
-        #TODO Check what actually needs to be done here 
-        self.llm_model = self.get_llm_model()
-        self.llm_API_key = self.get_llm_API_key()
-        
-        #Check if all settings are set
-        self.check_settings()
-        
-
-    def get_db_path(self) -> str:
-        os.getenv("DB_PATH") if os.getenv("DB_PATH") else "data/database.db"
-
-    def get_error_log_path(self) -> str:
-        os.getenv("ERROR_LOG_Path") if os.getenv("CSV_PATH") else "error.log"
-
-    def get_llm_model(self) -> str:
-        os.getenv("LLM_MODEL") if os.getenv("LLM_MODEL") else "" #TODO Add default model
-
-    def get_llm_API_key(self) -> str:
-        os.getenv("LLM_API_KEY") if os.getenv("LLM_API_KEY") else "" #TODO Add default API key
-
-    def check_settings(self) -> None:
-        #Check if all settings are set and raise an error if not
-        if self.llm_API_key == "":
-            raise ValueError("LLM API key is not set")
-        if self.llm_model == "":
-            raise ValueError("LLM model is not set")
-        if self.db_path == "":
-            raise ValueError("SQLite database path is not set")
-        if self.error_log_path == "":
-            raise ValueError("Error log path is not set")
+        db_path = os.getenv("DB_PATH", "data/database.db")
+        self.db_url = os.getenv("DB_URL", f"sqlite:///{db_path}")
+        self.llm_api_key = os.getenv("LLM_API_KEY", "")
+        self.max_rows_context = parse_max_rows_context(
+            os.getenv("MAX_ROWS_CONTEXT", "100")
+        )
+        self.sqlite_conn_pool_size = os.getenv("SQL_POOL_SIZE", 3)
