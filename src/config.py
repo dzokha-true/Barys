@@ -18,7 +18,9 @@ class Config:
         db_path = os.getenv("DB_PATH", "data/database.db")
         self.db_url = os.getenv("DB_URL", f"sqlite:///{db_path}")
         self.llm_api_key = os.getenv("LLM_API_KEY", "")
-        self.max_rows_context = parse_max_rows_context(
-            os.getenv("MAX_ROWS_CONTEXT", "100")
+        self.max_rows_context = int(
+                parse_max_rows_context(
+                os.getenv("MAX_ROWS_CONTEXT", "100")
+            )
         )
-        self.sqlite_conn_pool_size = os.getenv("SQL_POOL_SIZE", 3)
+        self.sqlite_conn_pool_size = int(os.getenv("SQL_POOL_SIZE", 3))
