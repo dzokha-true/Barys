@@ -1,0 +1,2 @@
+class LLMAdapter:
+    pass
