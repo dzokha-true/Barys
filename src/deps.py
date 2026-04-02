@@ -41,7 +41,6 @@ class Services:
 
 
 def _build_instance(class_type: Type[Any], *args: Any) -> Any:
-    """Try constructor injection first, then fallback for legacy zero-arg classes."""
     try:
         return class_type(*args)
     except TypeError:
@@ -63,7 +62,7 @@ def _load_class(module_name: str, class_name: str) -> Type[Any]:
 
 
 def init_services(config: Config) -> Services:
-    db_pool = SQLiteConnectionPool(config.db_url)
+    db_pool = SQLiteConnectionPool(config.db_url, config.sqlite_conn_pool_size)
 
     # Imported lazily so this module stays importable while other modules evolve.
     SchemaManager = _load_class("schema_manager", "SchemaManager")
