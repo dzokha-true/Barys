@@ -65,16 +65,16 @@ def init_services(config: Config) -> Services:
     db_pool = SQLiteConnectionPool(config.db_url, config.sqlite_conn_pool_size)
 
     # Imported lazily so this module stays importable while other modules evolve.
-    SchemaManager = _load_class("schema_manager", "SchemaManager")
-    QueryExecutor = _load_class("query_executor", "QueryExecutor")
-    LLMAdapter = _load_class("llm_adapter", "LLMAdapter")
-    QueryService = _load_class("query_service", "QueryService")
+    SchemaManagerInit = _load_class("schema_manager", "SchemaManager")
+    QueryExecutorInit = _load_class("query_executor", "QueryExecutor")
+    LLMAdapterInit = _load_class("llm_adapter", "LLMAdapter")
+    QueryServiceInit = _load_class("query_service", "QueryService")
 
-    schema_manager = _build_instance(SchemaManager, db_pool)
-    query_executor = _build_instance(QueryExecutor, db_pool)
-    llm_adapter = _build_instance(LLMAdapter, config)
+    schema_manager = _build_instance(SchemaManagerInit, db_pool)
+    query_executor = _build_instance(QueryExecutorInit, db_pool)
+    llm_adapter = _build_instance(LLMAdapterInit, config)
     query_service = _build_instance(
-        QueryService,
+        QueryServiceInit,
         schema_manager,
         query_executor,
         llm_adapter,
