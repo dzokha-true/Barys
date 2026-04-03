@@ -28,6 +28,18 @@ class CLI(cmd.Cmd):
         if self.max_import_size_bytes is None:
             self.max_import_size_bytes = Config().max_import_size_bytes
 
+    def _run_ingestor(self, snapshot_path: str) -> None:
+        ingest_file = getattr(self.ingestor, "ingest_file", None)
+        if callable(ingest_file):
+            ingest_file(snapshot_path)
+            return
+
+        if callable(self.ingestor):
+            self.ingestor(snapshot_path)
+            return
+
+        raise AttributeError("ingestor must be callable or implement ingest_file(path).")
+
     def _resolve_import_path(self, filepath: str) -> Path | None:
         file_arg = filepath.strip()
         if not file_arg:
@@ -124,7 +136,7 @@ class CLI(cmd.Cmd):
             return
 
         try:
-            self.ingestor.ingest_file(snapshot_path)
+            self._run_ingestor(snapshot_path)
             print(f"Import completed for '{normalized_path}'.")
         except Exception as exc:
             print(f"Import failed: {exc}")

@@ -2,7 +2,7 @@ import sqlite3
 from dataclasses import dataclass
 from importlib import import_module
 from queue import Empty, LifoQueue
-from typing import Any, Type
+from typing import Any, Callable, Type
 from config import Config
 from schema_manager import SchemaManager
 from query_executor import QueryExecutor
@@ -38,6 +38,7 @@ class Services:
     query_executor: QueryExecutor
     llm_adapter: LLMAdapter
     query_service: QueryService
+    csv_ingestor: Callable[[str], int]
 
 
 def _build_instance(class_type: Type[Any], *args: Any) -> Any:
@@ -69,6 +70,9 @@ def init_services(config: Config) -> Services:
     QueryExecutorInit = _load_class("query_executor", "QueryExecutor")
     LLMAdapterInit = _load_class("llm_adapter", "LLMAdapter")
     QueryServiceInit = _load_class("query_service", "QueryService")
+    csv_ingestor_module = import_module("csv_ingestor")
+
+    csv_ingest = getattr(csv_ingestor_module, "ingest_csv")
 
     schema_manager = _build_instance(SchemaManagerInit, db_pool)
     query_executor = _build_instance(QueryExecutorInit, db_pool)
@@ -81,10 +85,14 @@ def init_services(config: Config) -> Services:
         config,
     )
 
+    def ingest_file(csv_path: str) -> int:
+        return csv_ingest(csv_path, schema_manager, query_executor)
+
     return Services(
         db_pool=db_pool,
         schema_manager=schema_manager,
         query_executor=query_executor,
         llm_adapter=llm_adapter,
         query_service=query_service,
+        csv_ingestor=ingest_file,
     )

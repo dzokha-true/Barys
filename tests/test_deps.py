@@ -19,6 +19,14 @@ def load_deps_with_stubbed_modules(monkeypatch: pytest.MonkeyPatch):
         setattr(module, class_name, type(class_name, (), {}))
         monkeypatch.setitem(sys.modules, module_name, module)
 
+    csv_ingestor_module = types.ModuleType("csv_ingestor")
+
+    def ingest_csv(_filepath, _schema_manager, _query_executor, table_name=None):
+        return 0
+
+    csv_ingestor_module.ingest_csv = ingest_csv
+    monkeypatch.setitem(sys.modules, "csv_ingestor", csv_ingestor_module)
+
     sys.modules.pop("deps", None)
     deps = importlib.import_module("deps")
     return importlib.reload(deps)
@@ -129,6 +137,17 @@ def test_init_services_wires_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
         "QueryService": FakeQueryService,
     }
 
+    captured = {}
+
+    csv_ingestor_module = types.ModuleType("csv_ingestor")
+
+    def fake_ingest_csv(filepath, schema_manager, query_executor, table_name=None):
+        captured["args"] = (filepath, schema_manager, query_executor, table_name)
+        return 11
+
+    csv_ingestor_module.ingest_csv = fake_ingest_csv
+    monkeypatch.setitem(sys.modules, "csv_ingestor", csv_ingestor_module)
+
     monkeypatch.setattr(deps, "SQLiteConnectionPool", FakePool)
     monkeypatch.setattr(deps, "_load_class", lambda _module, class_name: class_map[class_name])
 
@@ -148,4 +167,13 @@ def test_init_services_wires_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
     assert services.query_service.query_executor is services.query_executor
     assert services.query_service.llm_adapter is services.llm_adapter
     assert services.query_service.config_obj is cfg
+
+    inserted = services.csv_ingestor("/tmp/sample.csv")
+    assert inserted == 11
+    assert captured["args"] == (
+        "/tmp/sample.csv",
+        services.schema_manager,
+        services.query_executor,
+        None,
+    )
 

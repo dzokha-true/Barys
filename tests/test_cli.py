@@ -107,6 +107,29 @@ def test_do_import_ingests_file_after_confirmation(
     assert f"Import completed for '{csv_file.resolve()}'" in captured.out
 
 
+def test_do_import_supports_callable_ingestor(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    def ingest_callable(path: str) -> None:
+        calls.append(path)
+
+    csv_file = tmp_path / "callable.csv"
+    csv_file.write_text("a,b\n1,2\n", encoding="utf-8")
+    cli = CLI(FakeQueryService(), ingest_callable, import_root=tmp_path)
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "y")
+
+    cli.do_import(str(csv_file))
+
+    captured = capsys.readouterr()
+    assert len(calls) == 1
+    assert "Import completed" in captured.out
+
+
 def test_do_import_reports_ingestion_failure(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

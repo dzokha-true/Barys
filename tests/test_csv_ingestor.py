@@ -9,7 +9,7 @@ SRC_DIR = Path(__file__).resolve().parents[1] / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from csv_ingestor import CSVIngestor
+from csv_ingestor import ingest_csv, infer_sql_types
 
 
 class FakeSchemaManager:
@@ -44,7 +44,7 @@ def test_infer_sql_types_maps_common_pandas_dtypes() -> None:
         }
     )
 
-    inferred = CSVIngestor().infer_sql_types(dataframe)
+    inferred = infer_sql_types(dataframe)
 
     assert inferred == {
         "int_col": "BIGINT",
@@ -61,13 +61,12 @@ def test_ingest_csv_builds_schema_and_inserts_in_chunks(tmp_path: Path) -> None:
 
     schema_manager = FakeSchemaManager()
     query_executor = FakeQueryExecutor()
-    ingestor = CSVIngestor(chunksize=2)
-
-    inserted = ingestor.ingest_csv(
+    inserted = ingest_csv(
         str(csv_file),
         schema_manager=schema_manager,
         query_executor=query_executor,
         table_name="scores",
+        chunksize=2,
     )
 
     assert inserted == 3
@@ -89,10 +88,8 @@ def test_ingest_csv_builds_schema_and_inserts_in_chunks(tmp_path: Path) -> None:
 
 
 def test_ingest_csv_raises_for_missing_file(tmp_path: Path) -> None:
-    ingestor = CSVIngestor()
-
     with pytest.raises(FileNotFoundError, match="was not found"):
-        ingestor.ingest_csv(
+        ingest_csv(
             str(tmp_path / "does_not_exist.csv"),
             schema_manager=FakeSchemaManager(),
             query_executor=FakeQueryExecutor(),
@@ -103,36 +100,12 @@ def test_ingest_csv_raises_for_empty_csv(tmp_path: Path) -> None:
     csv_file = tmp_path / "empty.csv"
     csv_file.write_text("a,b\n", encoding="utf-8")
 
-    ingestor = CSVIngestor()
-
     with pytest.raises(EmptyDataError, match="was empty"):
-        ingestor.ingest_csv(
+        ingest_csv(
             str(csv_file),
             schema_manager=FakeSchemaManager(),
             query_executor=FakeQueryExecutor(),
             table_name="empty_table",
         )
 
-
-def test_ingest_file_delegates_to_ingest_csv_with_injected_services(tmp_path: Path) -> None:
-    csv_file = tmp_path / "records.csv"
-    csv_file.write_text("id\n1\n", encoding="utf-8")
-
-    schema_manager = FakeSchemaManager()
-    query_executor = FakeQueryExecutor()
-    ingestor = CSVIngestor(
-        schema_manager=schema_manager,
-        query_executor=query_executor,
-        table_name="records",
-    )
-
-    inserted = ingestor.ingest_file(str(csv_file))
-
-    assert inserted == 1
-    assert schema_manager.calls[0][0] == "records"
-
-
-def test_ingest_file_requires_injected_services() -> None:
-    with pytest.raises(ValueError, match="requires schema_manager and query_executor"):
-        CSVIngestor().ingest_file("/tmp/anything.csv")
 
