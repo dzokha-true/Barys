@@ -180,6 +180,27 @@ class CLI(cmd.Cmd):
         if result is not None:
             print(result)
 
+    def do_tables(self, _line: str) -> None:
+        """List available tables from the connected SQLite database."""
+        schema_manager = getattr(self.query_service, "schema_manager", None)
+        if schema_manager is None or not hasattr(schema_manager, "get_existing_tables"):
+            print("Could not list tables: schema manager is unavailable.")
+            return
+
+        try:
+            table_names = list(schema_manager.get_existing_tables())
+        except Exception as exc:
+            print(f"Could not list tables: {exc}")
+            return
+
+        if not table_names:
+            print("No tables available.")
+            return
+
+        print("Available tables:")
+        for table_name in sorted(table_names):
+            print(f"  - {table_name}")
+
     def do_help(self, arg: str) -> None:
         """Show help for commands and natural-language query usage."""
         topic = arg.strip()
@@ -189,6 +210,7 @@ class CLI(cmd.Cmd):
 
         print("Available commands:")
         print("  import <filepath>   Import a CSV after confirmation")
+        print("  tables              List available tables")
         print("  help [command]      Show help for commands")
         print("  exit | quit         Exit the shell")
         print("  Ctrl-D              Exit the shell")
@@ -200,6 +222,10 @@ class CLI(cmd.Cmd):
         print("import <filepath>")
         print("  Reads the file size, asks for confirmation and table name, then imports via ingestor.")
         print(f"  Security limits: only regular files inside the import root, max size {max_size_gb:.2f} GB.")
+
+    def help_tables(self) -> None:
+        print("tables")
+        print("  List available tables discovered from the SQLite schema.")
 
     def help_exit(self) -> None:
         print("exit")

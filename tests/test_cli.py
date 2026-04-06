@@ -15,8 +15,9 @@ from cli import CLI
 
 
 class FakeQueryService:
-    def __init__(self) -> None:
+    def __init__(self, table_names: list[str] | None = None) -> None:
         self.calls: list[str] = []
+        self.schema_manager = SimpleNamespace(get_existing_tables=lambda: list(table_names or []))
 
     def process_nl_query(self, text: str) -> str:
         self.calls.append(text)
@@ -26,6 +27,11 @@ class FakeQueryService:
 class FailingQueryService:
     def process_nl_query(self, _text: str) -> str:
         raise RuntimeError("query failure")
+
+
+class QueryServiceWithoutSchemaManager:
+    def process_nl_query(self, _text: str) -> str:
+        return "ok"
 
 
 class FakeIngestor:
@@ -325,6 +331,26 @@ def test_help_with_topic_delegates_to_base_class(monkeypatch: pytest.MonkeyPatch
     cli.do_help("import")
 
     assert seen["topic"] == "import"
+
+
+def test_tables_lists_available_tables(capsys: pytest.CaptureFixture[str]) -> None:
+    cli = CLI(FakeQueryService(table_names=["users", "orders"]), FakeIngestor())
+
+    cli.do_tables("")
+
+    captured = capsys.readouterr()
+    assert "Available tables:" in captured.out
+    assert "  - orders" in captured.out
+    assert "  - users" in captured.out
+
+
+def test_tables_reports_when_schema_manager_is_unavailable(capsys: pytest.CaptureFixture[str]) -> None:
+    cli = CLI(QueryServiceWithoutSchemaManager(), FakeIngestor())
+
+    cli.do_tables("")
+
+    captured = capsys.readouterr()
+    assert "schema manager is unavailable" in captured.out
 
 
 def test_exit_quit_and_eof_exit_shell(capsys: pytest.CaptureFixture[str]) -> None:
