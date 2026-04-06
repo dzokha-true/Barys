@@ -396,11 +396,16 @@ def test_tables_reports_when_schema_manager_is_unavailable(capsys: pytest.Captur
     assert "schema manager is unavailable" in captured.out
 
 
-def test_tables_rm_removes_existing_table(capsys: pytest.CaptureFixture[str]) -> None:
+def test_tables_rm_removes_existing_table(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     query_service = FakeQueryService(table_names=[])
     schema_manager = RemovableSchemaManager(["users", "orders"])
     query_service.schema_manager = schema_manager
     cli = CLI(query_service, FakeIngestor())
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "y")
 
     cli.do_tables('rm "users"')
 
@@ -409,10 +414,15 @@ def test_tables_rm_removes_existing_table(capsys: pytest.CaptureFixture[str]) ->
     assert schema_manager.removed == ["users"]
 
 
-def test_tables_rm_reports_missing_table(capsys: pytest.CaptureFixture[str]) -> None:
+def test_tables_rm_reports_missing_table(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     query_service = FakeQueryService(table_names=[])
     query_service.schema_manager = RemovableSchemaManager(["orders"])
     cli = CLI(query_service, FakeIngestor())
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "y")
 
     cli.do_tables('rm "users"')
 
@@ -429,6 +439,24 @@ def test_tables_rm_prints_usage_when_table_name_missing(capsys: pytest.CaptureFi
 
     captured = capsys.readouterr()
     assert "Usage: tables rm <table_name>" in captured.out
+
+
+def test_tables_rm_cancels_when_user_declines(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    query_service = FakeQueryService(table_names=[])
+    schema_manager = RemovableSchemaManager(["users"])
+    query_service.schema_manager = schema_manager
+    cli = CLI(query_service, FakeIngestor())
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "n")
+
+    cli.do_tables('rm "users"')
+
+    captured = capsys.readouterr()
+    assert "Table removal cancelled." in captured.out
+    assert schema_manager.removed == []
 
 
 def test_exit_quit_and_eof_exit_shell(capsys: pytest.CaptureFixture[str]) -> None:

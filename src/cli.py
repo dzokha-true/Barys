@@ -223,6 +223,13 @@ class CLI(cmd.Cmd):
                     return
 
                 target_table = args[1]
+                confirmation = input(
+                    f"Are you sure you want to remove table '{target_table}'? (y/n) "
+                ).strip().lower()
+                if confirmation not in ("y", "yes"):
+                    print("Table removal cancelled.")
+                    return
+
                 try:
                     removed = bool(drop_table(target_table))
                 except Exception as exc:
