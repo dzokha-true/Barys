@@ -35,7 +35,10 @@ def test_config_uses_defaults_and_loads_dotenv(monkeypatch: pytest.MonkeyPatch) 
     for key in (
         "DB_PATH",
         "DB_URL",
+        "GEMINI_API_KEY",
         "LLM_API_KEY",
+        "LLM_MODEL",
+        "LLM_TIMEOUT_SECONDS",
         "MAX_ROWS_CONTEXT",
         "SQL_POOL_SIZE",
         "MAX_IMPORT_SIZE_BYTES",
@@ -57,8 +60,12 @@ def test_config_uses_defaults_and_loads_dotenv(monkeypatch: pytest.MonkeyPatch) 
     cfg = config.Config()
 
     assert dotenv_calls["path"] == "/tmp/.env"
+    assert cfg.db_path == "data/database.db"
     assert cfg.db_url == "sqlite:///data/database.db"
+    assert cfg.gemini_api_key == ""
     assert cfg.llm_api_key == ""
+    assert cfg.llm_model == "gemini-3.1-flash-lite-preview"
+    assert cfg.llm_timeout_seconds == 15.0
     assert cfg.max_rows_context == 100
     assert cfg.sqlite_conn_pool_size == 3
     assert cfg.max_import_size_bytes == 5 * 1024 * 1024 * 1024
@@ -70,18 +77,39 @@ def test_config_prefers_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setenv("DB_PATH", "data/local.db")
     monkeypatch.setenv("DB_URL", "postgresql://db.example.edu:5432/barys")
-    monkeypatch.setenv("LLM_API_KEY", "key-123")
+    monkeypatch.setenv("GEMINI_API_KEY", "gem-key-123")
+    monkeypatch.setenv("LLM_API_KEY", "legacy-key")
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.1-flash-lite-preview")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "9")
     monkeypatch.setenv("MAX_ROWS_CONTEXT", "42")
     monkeypatch.setenv("SQL_POOL_SIZE", "7")
     monkeypatch.setenv("MAX_IMPORT_SIZE_BYTES", "123456")
 
     cfg = config.Config()
 
+    assert cfg.db_path == "data/local.db"
     assert cfg.db_url == "postgresql://db.example.edu:5432/barys"
-    assert cfg.llm_api_key == "key-123"
+    assert cfg.gemini_api_key == "gem-key-123"
+    assert cfg.llm_api_key == "gem-key-123"
+    assert cfg.llm_model == "gemini-3.1-flash-lite-preview"
+    assert cfg.llm_timeout_seconds == 9.0
     assert cfg.max_rows_context == 42
     assert cfg.sqlite_conn_pool_size == 7
     assert cfg.max_import_size_bytes == 123456
+
+
+def test_config_uses_legacy_llm_api_key_when_gemini_key_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "find_dotenv", lambda: "")
+    monkeypatch.setattr(config, "load_dotenv", lambda _path: True)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_API_KEY", "legacy-only-key")
+
+    cfg = config.Config()
+
+    assert cfg.gemini_api_key == "legacy-only-key"
+    assert cfg.llm_api_key == "legacy-only-key"
 
 
 def test_config_raises_for_invalid_max_rows(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -107,8 +107,8 @@ def test_init_services_wires_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
     deps = load_deps_with_stubbed_modules(monkeypatch)
 
     class FakePool:
-        def __init__(self, db_url: str, pool_size: int) -> None:
-            self.db_url = db_url
+        def __init__(self, db_path: str, pool_size: int) -> None:
+            self.db_path = db_path
             self.pool_size = pool_size
 
     class FakeSchemaManager:
@@ -151,12 +151,12 @@ def test_init_services_wires_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(deps, "SQLiteConnectionPool", FakePool)
     monkeypatch.setattr(deps, "_load_class", lambda _module, class_name: class_map[class_name])
 
-    cfg = SimpleNamespace(db_url="sqlite:///tmp.db", sqlite_conn_pool_size=9)
+    cfg = SimpleNamespace(db_path="/tmp/test.db", db_url="sqlite:///tmp.db", sqlite_conn_pool_size=9)
 
     services = deps.init_services(cfg)
 
     assert isinstance(services.db_pool, FakePool)
-    assert services.db_pool.db_url == "sqlite:///tmp.db"
+    assert services.db_pool.db_path == "/tmp/test.db"
     assert services.db_pool.pool_size == 9
 
     assert services.schema_manager.db_pool is services.db_pool
