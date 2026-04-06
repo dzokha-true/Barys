@@ -24,6 +24,18 @@ class FakeQueryService:
         return f"answer:{text}"
 
 
+class DictQueryService:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def process_nl_query(self, text: str) -> dict[str, str]:
+        self.calls.append(text)
+        return {
+            "sql": "SELECT 1;",
+            "summary": "Found one row.",
+        }
+
+
 class FailingQueryService:
     def process_nl_query(self, _text: str) -> str:
         raise RuntimeError("query failure")
@@ -32,6 +44,22 @@ class FailingQueryService:
 class QueryServiceWithoutSchemaManager:
     def process_nl_query(self, _text: str) -> str:
         return "ok"
+
+
+class RemovableSchemaManager:
+    def __init__(self, table_names: list[str] | None = None) -> None:
+        self.table_names = list(table_names or [])
+        self.removed: list[str] = []
+
+    def get_existing_tables(self) -> list[str]:
+        return list(self.table_names)
+
+    def drop_table(self, table_name: str) -> bool:
+        if table_name not in self.table_names:
+            return False
+        self.table_names.remove(table_name)
+        self.removed.append(table_name)
+        return True
 
 
 class FakeIngestor:
@@ -300,6 +328,20 @@ def test_default_routes_nl_query_and_prints_result(capsys: pytest.CaptureFixture
     assert "answer:show all tables" in captured.out
 
 
+def test_default_formats_sql_and_summary_when_query_service_returns_dict(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    query_service = DictQueryService()
+    cli = CLI(query_service, FakeIngestor())
+
+    cli.default("who is latest")
+
+    captured = capsys.readouterr()
+    assert query_service.calls == ["who is latest"]
+    assert "SQL:\nSELECT 1;" in captured.out
+    assert "Summary:\nFound one row." in captured.out
+
+
 def test_default_reports_query_failures(capsys: pytest.CaptureFixture[str]) -> None:
     cli = CLI(FailingQueryService(), FakeIngestor())
 
@@ -316,6 +358,7 @@ def test_help_without_topic_prints_overview(capsys: pytest.CaptureFixture[str]) 
 
     captured = capsys.readouterr()
     assert "Available commands:" in captured.out
+    assert "tables [rm <name>]" in captured.out
     assert "Any non-command text is treated as a natural-language query." in captured.out
 
 
@@ -351,6 +394,41 @@ def test_tables_reports_when_schema_manager_is_unavailable(capsys: pytest.Captur
 
     captured = capsys.readouterr()
     assert "schema manager is unavailable" in captured.out
+
+
+def test_tables_rm_removes_existing_table(capsys: pytest.CaptureFixture[str]) -> None:
+    query_service = FakeQueryService(table_names=[])
+    schema_manager = RemovableSchemaManager(["users", "orders"])
+    query_service.schema_manager = schema_manager
+    cli = CLI(query_service, FakeIngestor())
+
+    cli.do_tables('rm "users"')
+
+    captured = capsys.readouterr()
+    assert "Removed table 'users'." in captured.out
+    assert schema_manager.removed == ["users"]
+
+
+def test_tables_rm_reports_missing_table(capsys: pytest.CaptureFixture[str]) -> None:
+    query_service = FakeQueryService(table_names=[])
+    query_service.schema_manager = RemovableSchemaManager(["orders"])
+    cli = CLI(query_service, FakeIngestor())
+
+    cli.do_tables('rm "users"')
+
+    captured = capsys.readouterr()
+    assert "table does not exist" in captured.out
+
+
+def test_tables_rm_prints_usage_when_table_name_missing(capsys: pytest.CaptureFixture[str]) -> None:
+    query_service = FakeQueryService(table_names=[])
+    query_service.schema_manager = RemovableSchemaManager(["users"])
+    cli = CLI(query_service, FakeIngestor())
+
+    cli.do_tables("rm")
+
+    captured = capsys.readouterr()
+    assert "Usage: tables rm <table_name>" in captured.out
 
 
 def test_exit_quit_and_eof_exit_shell(capsys: pytest.CaptureFixture[str]) -> None:

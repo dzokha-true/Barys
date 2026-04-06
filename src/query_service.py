@@ -35,9 +35,11 @@ class QueryService:
         top_rows = rows[: self._hard_row_limit]
 
         summary_prompt = (
-            f"User asked: {user_question}. "
-            f"The database returned these rows: {top_rows}. "
-            "Provide a concise, natural language answer."
+            "Use this query context to answer the user request clearly and concisely.\n"
+            f"User question: {user_question}\n"
+            f"Executed SQL: {sql_for_execution}\n"
+            f"SQL output rows: {top_rows}\n"
+            "Do not speculate. If the rows are empty, state that no matching records were found."
         )
         summary = self.llm_adapter.generate_nl_summary(summary_prompt, top_rows)
 

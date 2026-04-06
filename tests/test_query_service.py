@@ -60,8 +60,9 @@ def test_process_nl_query_runs_two_pass_flow_with_hard_limit() -> None:
     }
     assert adapter.sql_calls == [("show users", schema)]
     assert adapter.summary_calls[0][1] == rows[:10]
-    assert "User asked: show users." in adapter.summary_calls[0][0]
-    assert "Provide a concise, natural language answer." in adapter.summary_calls[0][0]
+    assert "User question: show users" in adapter.summary_calls[0][0]
+    assert "Executed SQL: SELECT id, name FROM users LIMIT 10" in adapter.summary_calls[0][0]
+    assert f"SQL output rows: {rows[:10]}" in adapter.summary_calls[0][0]
 
 
 def test_process_nl_query_preserves_existing_limit() -> None:

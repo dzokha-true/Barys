@@ -81,6 +81,16 @@ class SchemaManager:
         self.conn.commit()
         self.refresh_cache()
 
+    def drop_table(self, table_name: str) -> bool:
+        safe_table_name = sanitizer.enforce_identifier_whitelist(table_name)
+        if safe_table_name not in set(self.get_existing_tables()):
+            return False
+
+        self.cursor.execute(f'DROP TABLE "{safe_table_name}"')
+        self.conn.commit()
+        self.refresh_cache()
+        return True
+
     def refresh_cache(self) -> None:
         cache: dict[str, dict[str, object]] = {}
         table_names = self.get_existing_tables()

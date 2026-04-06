@@ -178,13 +178,65 @@ class CLI(cmd.Cmd):
             return
 
         if result is not None:
+            if isinstance(result, dict):
+                sql_text = result.get("sql")
+                summary_text = result.get("summary")
+                if sql_text is not None or summary_text is not None:
+                    if sql_text is not None:
+                        print("SQL:")
+                        print(sql_text)
+                    if summary_text is not None:
+                        if sql_text is not None:
+                            print()
+                        print("Summary:")
+                        print(summary_text)
+                    return
             print(result)
 
     def do_tables(self, _line: str) -> None:
-        """List available tables from the connected SQLite database."""
+        """List tables, or remove one with: tables rm <table_name>."""
         schema_manager = getattr(self.query_service, "schema_manager", None)
         if schema_manager is None or not hasattr(schema_manager, "get_existing_tables"):
             print("Could not list tables: schema manager is unavailable.")
+            return
+
+        line = _line.strip()
+        if line:
+            try:
+                args = shlex.split(line)
+            except ValueError:
+                print("Usage: tables [rm <table_name>]")
+                return
+
+            if not args:
+                print("Usage: tables [rm <table_name>]")
+                return
+
+            if args[0] == "rm":
+                if len(args) != 2:
+                    print("Usage: tables rm <table_name>")
+                    return
+
+                drop_table = getattr(schema_manager, "drop_table", None)
+                if not callable(drop_table):
+                    print("Could not remove table: schema manager does not support table deletion.")
+                    return
+
+                target_table = args[1]
+                try:
+                    removed = bool(drop_table(target_table))
+                except Exception as exc:
+                    print(f"Could not remove table '{target_table}': {exc}")
+                    return
+
+                if not removed:
+                    print(f"Could not remove table '{target_table}': table does not exist.")
+                    return
+
+                print(f"Removed table '{target_table}'.")
+                return
+
+            print("Usage: tables [rm <table_name>]")
             return
 
         try:
@@ -210,7 +262,7 @@ class CLI(cmd.Cmd):
 
         print("Available commands:")
         print("  import <filepath>   Import a CSV after confirmation")
-        print("  tables              List available tables")
+        print("  tables [rm <name>]  List tables or remove a table")
         print("  help [command]      Show help for commands")
         print("  exit | quit         Exit the shell")
         print("  Ctrl-D              Exit the shell")
@@ -224,8 +276,9 @@ class CLI(cmd.Cmd):
         print(f"  Security limits: only regular files inside the import root, max size {max_size_gb:.2f} GB.")
 
     def help_tables(self) -> None:
-        print("tables")
+        print("tables [rm <table_name>]")
         print("  List available tables discovered from the SQLite schema.")
+        print("  Use 'tables rm <table_name>' to delete a table.")
 
     def help_exit(self) -> None:
         print("exit")

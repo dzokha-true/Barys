@@ -56,3 +56,24 @@ def test_refresh_cache_calls_identifier_whitelist(monkeypatch: pytest.MonkeyPatc
 
 	assert "events" in seen
 
+
+def test_drop_table_removes_existing_table() -> None:
+	conn = sqlite3.connect(":memory:")
+	manager = schema_manager.SchemaManager(db_pool=FakePool(conn))
+	manager.create_table("users", {"id": "INTEGER"})
+
+	removed = manager.drop_table("users")
+
+	assert removed is True
+	assert "users" not in manager.get_existing_tables()
+
+
+def test_drop_table_returns_false_when_missing() -> None:
+	conn = sqlite3.connect(":memory:")
+	manager = schema_manager.SchemaManager(db_pool=FakePool(conn))
+
+	removed = manager.drop_table("missing_table")
+
+	assert removed is False
+
+
