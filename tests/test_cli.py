@@ -36,6 +36,14 @@ class FakeIngestor:
         self.calls.append(path)
 
 
+class TableAwareIngestor:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str | None]] = []
+
+    def ingest_file(self, path: str, table_name: str | None = None) -> None:
+        self.calls.append((path, table_name))
+
+
 class FailingIngestor:
     def ingest_file(self, _path: str) -> None:
         raise RuntimeError("ingestion failure")
@@ -89,22 +97,51 @@ def test_do_import_ingests_file_after_confirmation(
     csv_file.write_text("a,b\n1,2\n", encoding="utf-8")
     cli = CLI(FakeQueryService(), ingestor, import_root=tmp_path)
 
-    prompt_holder = {}
+    prompts: list[str] = []
 
     def fake_input(prompt: str) -> str:
-        prompt_holder["text"] = prompt
-        return "y"
+        prompts.append(prompt)
+        if "Are you sure" in prompt:
+            return "y"
+        return "test_table"
 
     monkeypatch.setattr("builtins.input", fake_input)
 
     cli.do_import(f'"{csv_file}"')
 
     captured = capsys.readouterr()
-    assert "approximately" in prompt_holder["text"]
+    assert any("approximately" in prompt for prompt in prompts)
+    assert any("Destination table name" in prompt for prompt in prompts)
     assert len(ingestor.calls) == 1
     assert Path(ingestor.calls[0]).name.startswith("barys_import_")
     assert not os.path.exists(ingestor.calls[0])
-    assert f"Import completed for '{csv_file.resolve()}'" in captured.out
+    assert f"Import completed for '{csv_file.resolve()}' into table 'test_table'." in captured.out
+
+
+def test_do_import_passes_requested_table_name_to_ingestor(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    ingestor = TableAwareIngestor()
+    csv_file = tmp_path / "my-data.csv"
+    csv_file.write_text("a,b\n1,2\n", encoding="utf-8")
+    cli = CLI(FakeQueryService(), ingestor, import_root=tmp_path)
+
+    def fake_input(prompt: str) -> str:
+        if "Are you sure" in prompt:
+            return "y"
+        return "test"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+
+    cli.do_import(str(csv_file))
+
+    captured = capsys.readouterr()
+    assert len(ingestor.calls) == 1
+    _, table_name = ingestor.calls[0]
+    assert table_name == "test"
+    assert "into table 'test'" in captured.out
 
 
 def test_do_import_supports_callable_ingestor(

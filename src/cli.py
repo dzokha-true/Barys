@@ -28,14 +28,20 @@ class CLI(cmd.Cmd):
         if self.max_import_size_bytes is None:
             self.max_import_size_bytes = Config().max_import_size_bytes
 
-    def _run_ingestor(self, snapshot_path: str) -> None:
+    def _run_ingestor(self, snapshot_path: str, table_name: str | None = None) -> None:
         ingest_file = getattr(self.ingestor, "ingest_file", None)
         if callable(ingest_file):
-            ingest_file(snapshot_path)
+            try:
+                ingest_file(snapshot_path, table_name=table_name)
+            except TypeError:
+                ingest_file(snapshot_path)
             return
 
         if callable(self.ingestor):
-            self.ingestor(snapshot_path)
+            try:
+                self.ingestor(snapshot_path, table_name=table_name)
+            except TypeError:
+                self.ingestor(snapshot_path)
             return
 
         raise AttributeError("ingestor must be callable or implement ingest_file(path).")
@@ -45,7 +51,6 @@ class CLI(cmd.Cmd):
         if not file_arg:
             print("Usage: import <filepath>")
             return None
-
         try:
             parsed_args = shlex.split(file_arg)
         except ValueError:
@@ -65,6 +70,13 @@ class CLI(cmd.Cmd):
         except OSError as exc:
             print(f"Could not access file '{candidate_path}': {exc}")
             return None
+
+    def _default_table_name_for_path(self, source_path: Path) -> str:
+        cleaned = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in source_path.stem)
+        cleaned = cleaned.strip("_") or "imported_data"
+        if cleaned[0].isdigit():
+            cleaned = f"t_{cleaned}"
+        return cleaned
 
     # Security consideration - restricting the allowed import path to the relative path (import white-list)
     def _is_allowed_import_path(self, resolved_path: Path) -> bool:
@@ -135,9 +147,15 @@ class CLI(cmd.Cmd):
             print("Import failed: could not create a secure file snapshot.")
             return
 
+        default_table_name = self._default_table_name_for_path(normalized_path)
+        table_prompt = (
+            f"Destination table name [default: {default_table_name}]: "
+        )
+        requested_table_name = input(table_prompt).strip() or default_table_name
+
         try:
-            self._run_ingestor(snapshot_path)
-            print(f"Import completed for '{normalized_path}'.")
+            self._run_ingestor(snapshot_path, table_name=requested_table_name)
+            print(f"Import completed for '{normalized_path}' into table '{requested_table_name}'.")
         except Exception as exc:
             print(f"Import failed: {exc}")
         finally:
@@ -180,7 +198,7 @@ class CLI(cmd.Cmd):
     def help_import(self) -> None:
         max_size_gb = self.max_import_size_bytes / (1024 * 1024 * 1024)
         print("import <filepath>")
-        print("  Reads the file size, asks for confirmation, then imports via ingestor.")
+        print("  Reads the file size, asks for confirmation and table name, then imports via ingestor.")
         print(f"  Security limits: only regular files inside the import root, max size {max_size_gb:.2f} GB.")
 
     def help_exit(self) -> None:

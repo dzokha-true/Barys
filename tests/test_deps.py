@@ -177,3 +177,12 @@ def test_init_services_wires_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
         None,
     )
 
+    inserted_named = services.csv_ingestor("/tmp/sample.csv", "test")
+    assert inserted_named == 11
+    assert captured["args"] == (
+        "/tmp/sample.csv",
+        services.schema_manager,
+        services.query_executor,
+        "test",
+    )
+
