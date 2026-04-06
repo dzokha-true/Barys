@@ -82,7 +82,9 @@ class LLMAdapter:
     def _build_sql_system_prompt(self, schema: Any) -> str:
         return (
             "You are a SQL generator. Return exactly one read-only SQLite SQL query and no markdown. "
-            "Do not explain the query. Use only tables and columns in this schema:\n"
+            "Do not explain the query. Use only tables and columns in this schema. "
+            "If the user asks to list tables, use SELECT against sqlite_master. "
+            "If the user asks for table columns, you may use PRAGMA table_info(<table_name>).\n"
             f"{self._format_schema(schema)}"
         )
 

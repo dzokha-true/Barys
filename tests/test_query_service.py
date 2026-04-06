@@ -86,3 +86,15 @@ def test_process_nl_query_raises_for_unsafe_sql() -> None:
     assert executor.last_sql is None
     assert adapter.summary_calls == []
 
+
+def test_process_nl_query_does_not_append_limit_to_pragma() -> None:
+    adapter = FakeLLMAdapter("PRAGMA table_info(users)")
+    executor = FakeExecutor([(0, "id", "INTEGER", 0, None, 0)])
+    service = query_service.QueryService(FakeSchemaManager("users(id INTEGER)"), executor, adapter)
+
+    result = service.process_nl_query("what columns are in users")
+
+    assert executor.last_sql == "PRAGMA table_info(users)"
+    assert result["sql"] == "PRAGMA table_info(users)"
+
+

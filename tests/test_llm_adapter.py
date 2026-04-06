@@ -46,6 +46,8 @@ def test_generate_sql_calls_gemini_with_combined_prompt() -> None:
     assert "System instruction:" in call["contents"]
     assert "Show all user ids" in call["contents"]
     assert "users" in call["contents"]
+    assert "sqlite_master" in call["contents"]
+    assert "PRAGMA table_info" in call["contents"]
 
 
 def test_generate_nl_summary_uses_row_limit() -> None:

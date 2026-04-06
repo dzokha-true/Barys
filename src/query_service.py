@@ -48,6 +48,9 @@ class QueryService:
 
     def _ensure_limit(self, sql: str, limit: int) -> str:
         statement = sql.strip()
+        if not statement.lower().startswith("select"):
+            return statement
+
         if re.search(r"\blimit\b", statement, flags=re.IGNORECASE):
             return statement
 
