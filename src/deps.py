@@ -11,8 +11,8 @@ from llm_adapter import LLMAdapter
 
 
 class SQLiteConnectionPool:
-    def __init__(self, db_url: str, pool_size: int = 6) -> None:
-        self.db_path = db_url
+    def __init__(self, db_path: str, pool_size: int = 6) -> None:
+        self.db_path = db_path
         self.pool = LifoQueue(maxsize=pool_size) #LIFO, because we want to make use of the cache locality
 
         for _ in range(pool_size):
@@ -38,7 +38,7 @@ class Services:
     query_executor: QueryExecutor
     llm_adapter: LLMAdapter
     query_service: QueryService
-    csv_ingestor: Callable[[str], int]
+    csv_ingestor: Callable[[str, str | None], int]
 
 
 def _build_instance(class_type: Type[Any], *args: Any) -> Any:
@@ -63,7 +63,7 @@ def _load_class(module_name: str, class_name: str) -> Type[Any]:
 
 
 def init_services(config: Config) -> Services:
-    db_pool = SQLiteConnectionPool(config.db_url, config.sqlite_conn_pool_size)
+    db_pool = SQLiteConnectionPool(config.db_path, config.sqlite_conn_pool_size)
 
     # Imported lazily so this module stays importable while other modules evolve.
     SchemaManagerInit = _load_class("schema_manager", "SchemaManager")
@@ -85,8 +85,8 @@ def init_services(config: Config) -> Services:
         config,
     )
 
-    def ingest_file(csv_path: str) -> int:
-        return csv_ingest(csv_path, schema_manager, query_executor)
+    def ingest_file(csv_path: str, table_name: str | None = None) -> int:
+        return csv_ingest(csv_path, schema_manager, query_executor, table_name=table_name)
 
     return Services(
         db_pool=db_pool,
